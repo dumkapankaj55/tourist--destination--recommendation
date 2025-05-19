@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Travel Recommendation + Shortest Path</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <!-- Bootstrap + Font Awesome -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+
+    <!-- AOS -->
+    <link href="https://cdn.jsdelivr.net/npm/aos@2.3.4/dist/aos.css" rel="stylesheet">
+
+    <style>
+        body {
+            background: url('{{ url_for('static', filename='bg-travel.jpg') }}') no-repeat center center fixed;
+            background-size: cover;
+            font-family: 'Segoe UI', sans-serif;
+            color: white;
+        }
+        .glass-card {
+            background: rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(15px);
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+        }
+        label, select, input { color: #fff; }
+        .form-label { font-weight: bold; }
+        .btn-custom {
+            background: linear-gradient(90deg, #00B4DB, #0083B0);
+            border: none;
+            color: white;
+        }
+        .btn-custom:hover {
+            background: linear-gradient(90deg, #007bff, #0056b3);
+        }
+        .section-title {
+            font-size: 2rem;
+            color: #fff;
+            margin-bottom: 20px;
+        }
+        .fa-icon { margin-right: 8px; color: #00B4DB; }
+        .alert-info {
+            background-color: rgba(0, 123, 255, 0.2);
+            color: white;
+            border: none;
+        }
+        .table {
+            background-color: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(5px);
+            border-radius: 10px;
+            overflow: hidden;
+            color: #e3f2fd;
+        }
+        .table th {
+            background-color: rgba(0, 132, 176, 0.7);
+            text-align: center;
+        }
+        .table td {
+            background-color: rgba(255, 255, 255, 0.05);
+        }
+        .table-bordered th, .table-bordered td {
+            border: 1px solid rgba(255, 255, 255, 0.15);
+        }
+        .table-striped tbody tr:nth-of-type(odd) {
+            background-color: rgba(0, 0, 0, 0.1);
+        }
+        #map {
+            height: 500px;
+            border-radius: 12px;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container my-5">
+    <div class="glass-card" data-aos="fade-up">
+        <h2 class="text-center section-title"><i class="fa-solid fa-plane-departure fa-icon"></i> Travel Recommendation System</h2>
+        <p class="text-center mb-4">Fill in your details to get the best personalized travel destinations and navigate between them!</p>
+
+        <form action="/recommend" method="POST">
+            <div class="row g-4">
+                <div class="col-md-4"><label class="form-label">User ID</label><input type="number" name="user_id" class="form-control" required></div>
+                <div class="col-md-4"><label class="form-label">Destination Name</label>
+                    <select name="name" class="form-select" required>
+                        <option value="">Choose</option>
+                        <option>Jaipur City</option><option>Taj Mahal</option><option>Kerala Backwaters</option><option>Goa Beaches</option><option>Leh Ladakh</option>
+                    </select>
+                </div>
+                <div class="col-md-4"><label class="form-label">Type</label>
+                    <select name="type" class="form-select" required>
+                        <option value="">Choose</option>
+                        <option>City</option><option>Historical</option><option>Nature</option><option>Beach</option><option>Adventure</option>
+                    </select>
+                </div>
+                <div class="col-md-4"><label class="form-label">State</label>
+                    <select name="state" class="form-select" required>
+                        <option value="">Choose</option>
+                        <option>Rajasthan</option><option>Uttar Pradesh</option><option>Kerala</option><option>Goa</option><option>Jammu and Kashmir</option>
+                    </select>
+                </div>
+                <div class="col-md-4"><label class="form-label">Best Time to Visit</label>
+                    <select name="best_time" class="form-select" required>
+                        <option value="">Choose</option>
+                        <option>Oct-Mar</option><option>Nov-Feb</option><option>Sep-Mar</option><option>Nov-Mar</option><option>Apr-Jun</option>
+                    </select>
+                </div>
+                <div class="col-md-4"><label class="form-label">Preferences</label>
+                    <select name="preferences" class="form-select" required>
+                        <option value="">Choose</option>
+                        <option>City, Historical</option><option>Nature, Adventure</option><option>Beaches, Historical</option>
+                    </select>
+                </div>
+                <div class="col-md-4"><label class="form-label">Gender</label>
+                    <select name="gender" class="form-select" required>
+                        <option value="">Choose</option>
+                        <option>Female</option><option>Male</option>
+                    </select>
+                </div>
+                <div class="col-md-4"><label class="form-label">Number of Adults</label><input type="number" name="adults" class="form-control" required></div>
+                <div class="col-md-4"><label class="form-label">Number of Children</label><input type="number" name="children" class="form-control" required></div>
+            </div>
+
+            <div class="text-center mt-4">
+                <button type="submit" class="btn btn-custom btn-lg"><i class="fa-solid fa-compass"></i> Get Recommendations</button>
+            </div>
+        </form>
+
+        {% if not recommended_destinations.empty %}
+        <h3 class="text-center mt-5"><i class="fa-solid fa-map-location-dot fa-icon"></i> Recommended Destinations</h3>
+        <div class="table-responsive">
+            <table class="table table-bordered table-striped mt-3">
+                <thead>
+                    <tr><th>Destination</th><th>State</th><th>Type</th><th>Best Time</th><th>Popularity</th></tr>
+                </thead>
+                <tbody>
+                    {% for d in recommended_destinations.itertuples() %}
+                    <tr>
+                        <td>{{ d.Name }}</td>
+                        <td>{{ d.State }}</td>
+                        <td>{{ d.Type }}</td>
+                        <td>{{ d.BestTimeToVisit }}</td>
+                        <td>{{ d.Popularity }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endif %}
+
+        {% if predicted_popularity %}
+        <div class="alert alert-info mt-3">
+            <strong>Predicted Popularity:</strong> {{ predicted_popularity }}
+        </div>
+        {% endif %}
+
+        <!-- MAP PATHFINDING -->
+        <div class="mt-5">
+            <h4>Click on the map to select <span class="text-warning">Start</span> and <span class="text-success">End</span> points</h4>
+            <select id="algorithm" class="form-select w-50 mb-2">
+                <option value="dijkstra">Dijkstra</option>
+                <option value="astar">A*</option>
+            </select>
+            <button onclick="calculatePath()" class="btn btn-custom mb-3">Calculate Shortest Path</button>
+            <div id="map"></div>
+        </div>
+    </div>
+</div>
+
+<!-- JS Libraries -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/aos@2.3.4/dist/aos.js"></script>
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+
+<script>
+AOS.init({ duration: 1000 });
+
+let map = L.map('map').setView([20.5937, 78.9629], 5);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© OpenStreetMap contributors'
+}).addTo(map);
+
+let markers = [];
+let routeLine = null;
+
+map.on('click', function(e) {
+    if (markers.length < 2) {
+        const marker = L.marker(e.latlng).addTo(map);
+        markers.push(marker);
+    }
+});
+
+function calculatePath() {
+    if (markers.length !== 2) {
+        alert("Please select both Start and End points on the map.");
+        return;
+    }
+
+    const algorithm = document.getElementById('algorithm').value;
+    const start = markers[0].getLatLng();
+    const end = markers[1].getLatLng();
+
+    axios.post('/shortest_path', {
+        start: { lat: start.lat, lng: start.lng },
+        end: { lat: end.lat, lng: end.lng },
+        algorithm: algorithm
+    })
+    .then(res => {
+        if (routeLine) map.removeLayer(routeLine);
+        routeLine = L.polyline(res.data.path, {
+            color: 'lime', weight: 4
+        }).addTo(map);
+        map.fitBounds(routeLine.getBounds());
+    })
+    .catch(err => {
+        console.error(err);
+        alert("Failed to compute shortest path.");
+    });
+}
+</script>
+</body>
+</html>
